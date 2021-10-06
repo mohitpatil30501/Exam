@@ -1,0 +1,92 @@
+{% extends 'dashboard/basic_dashboard.html' %}
+{% load static %}
+
+
+{% block title %}
+  {{ Server_Title }} | Dashboard
+{% endblock %}
+
+
+{% block content %}
+<section class="content container-fluid">
+  <h5 class="mb-2 pt-4">Latest Uploaded Test</h5>
+  <div class="row" id="recent_uploaded_test">
+
+  </div>
+</section>
+<section class="content container-fluid">
+  <h5 class="mb-2 mt-4">In Progress Test</h5>
+  <div class="row">
+
+  </div>
+</section>
+<section class="content container-fluid">
+  <h5 class="mb-2 mt-4">Recent Solved Test</h5>
+  <div class="row" >
+
+  </div>
+</section>
+
+<hr class="text-muted">
+
+<section class="content container-fluid">
+  <!-- DONUT CHART -->
+  <div class="card card-danger">
+    <div class="card-header">
+      <h3 class="card-title">Progress about Total Questions</h3>
+
+      <div class="card-tools">
+        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+          <i class="fas fa-minus"></i>
+        </button>
+        <button type="button" class="btn btn-tool" data-card-widget="remove">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <canvas id="donutChart" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
+    </div>
+    <!-- /.card-body -->
+  </div>
+  <!-- /.card -->
+</section>
+
+<script src="{% static 'js/dashboard/dashboard.js' %}"></script>
+<!-- ChartJS -->
+<script src="{% static 'plugins/chart.js/Chart.min.js' %}"></script>
+<script>
+  $(function () {
+    var donutChartCanvas = $('#donutChart').get(0).getContext('2d')
+    var donutData        = {
+      labels: [
+          'Wrong',
+          'Correct',
+          'Unsolved',
+      ],
+      datasets: [
+        {
+          data: [37, 44, 19],
+          backgroundColor : ['#f56954', '#00a65a', '#d2d6de'],
+        }
+      ]
+    }
+    var donutOptions     = {
+      maintainAspectRatio : false,
+      responsive : true,
+    }
+    //Create pie or douhnut chart
+    // You can switch between pie and douhnut using the method below.
+    var donutChart = new Chart(donutChartCanvas, {
+      type: 'doughnut',
+      data: donutData,
+      options: donutOptions
+    })
+    })
+</script>
+{% endblock %}
+
+
+{% block extra %}
+
+{% endblock %}
