@@ -552,7 +552,7 @@ class Dashboard:
             if self.user.is_authenticated:
                 recent_uploaded_test_list = []
                 count = 0
-                for test in list(Test.objects.filter(author=self.user, status=True).order_by('-created_on')):
+                for test in list(Test.objects.filter(status=True).order_by('-created_on')):
                     recent_uploaded_test_list.append({
                         'id': test.id,
                         'title': test.title,
