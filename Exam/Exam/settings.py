@@ -5,7 +5,6 @@ import configparser
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Reading Properties
 config = configparser.RawConfigParser()
 config.read('Database/server.properties')
@@ -26,7 +25,6 @@ SECRET_KEY = config.get('SecretSection', 'secret.key')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config.getboolean('SecretSection', 'secret.debug')
-
 
 ALLOWED_HOSTS = ['127.0.0.1', config.get('SecretSection', 'secret.host')]
 
@@ -75,14 +73,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Exam.wsgi.application'
 
-
 DATABASES = {
+    # 'default': {
+    #     'ENGINE': 'django.db.backends.sqlite3',
+    #     'NAME': BASE_DIR / 'Database/db.sqlite3',
+    # }
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'Database/db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'd5lmu53g5ogin0',
+        'USER': 'btvlljgasrywcw',
+        'PASSWORD': '8c360d9d84ea195b29e2cc145c2d0277e665c95bb38ba57e8b2798f9c2c409e1',
+        'HOST': 'ec2-34-239-33-57.compute-1.amazonaws.com',
+        'PORT': 5432,
     }
 }
-
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -99,13 +103,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 LANGUAGE_CODE = config.get('Server', 'server.language_code')
 TIME_ZONE = config.get('Server', 'server.time_zone')
 USE_I18N = True
 USE_L10N = True
 USE_TZ = False
-
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
