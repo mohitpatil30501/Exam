@@ -1053,10 +1053,16 @@ class Examine:
                             else:
                                 unsolved_questions.append(answer)
 
+                        try:
+                            remaining_time = Exam.time_to_second(answersheet.remaining_time)
+                        except:
+                            remaining_time = 0
+                        required_time = Exam.second_to_time(Exam.time_to_second(test.total_time) - remaining_time)
+
                         data = {
                             'username': answersheet.user.username,
                             'obtained_marks': len(correct_questions) * test.marks_per_question,
-                            'required_time': Exam.second_to_time(Exam.time_to_second(test.total_time) - Exam.time_to_second(answersheet.remaining_time)),
+                            'required_time': required_time
                         }
 
                         test_list.append(data)
