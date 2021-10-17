@@ -12,6 +12,7 @@ urlpatterns = [
 
     path('dashboard', views.Dashboard.dashboard),
     path('test', views.Dashboard.test),
+    path('exam_list', views.Dashboard.exam_list),
     path('settings', views.Dashboard.settings),
 
     path('examine', views.Examine.examine),
@@ -22,4 +23,12 @@ urlpatterns = [
     path('examine/add_question', views.Examine.add_question),
     path('examine/question', views.Examine.question),
     path('examine/edit_question', views.Examine.edit_question),
+    path('examine/result_list', views.Examine.result_list),
+
+    path('exam', views.Exam.exam),
+    path('start_exam', views.Exam.start_exam),
+    path('exam/time', views.Exam.time),
+    path('exam/answered', views.Exam.answered),
+    path('exam/end', views.Exam.end_exam),
+    path('result', views.Exam.result),
 ]

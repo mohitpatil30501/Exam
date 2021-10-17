@@ -1,12 +1,14 @@
 $(function(){
     var token = $("input[name='csrfmiddlewaretoken']").val();
-    var url = "/api/exam_list";
-    var type = "GET";
+    var id = $("#test-id").val();
+    var url = "/api/examine/result_list";
+    var type = "POST";
     $.ajax({
            async: true,
            type: type,
            url: url,
            data: {
+                'id': id,
                 'csrfmiddlewaretoken': token
            },
            success: function(data)
@@ -18,25 +20,11 @@ $(function(){
                     var table = '<tbody id="table-body">';
 
                     for (var i = 0; i < testListLength; i++) {
-                        if(data['test_list'][i].status == true){
-                            data['test_list'][i].status = 'Submitted'
-                        }
-                        else if(data['test_list'][i].status == false){
-                            data['test_list'][i].status = 'In Progress'
-                        }
-                        else{
-                            data['test_list'][i].status = 'Not Attempted'
-                        }
                         table = table + `
                            <tr>
-                            <td>` + data['test_list'][i].name + `</td>
-                            <td>` + data['test_list'][i].subject + `</td>
-                            <td>` + data['test_list'][i].status + `</td>
-                            <td>
-                                <div class="pb-1">
-                                    <a href="/test/` + data['test_list'][i].id + `" class="btn btn-success w-100">Info</a>
-                                </div>
-                            </td>
+                            <td>` + data['test_list'][i].username + `</td>
+                            <td>` + data['test_list'][i].obtained_marks + `</td>
+                            <td>` + Duration(data['test_list'][i].required_time) + `</td>
                           </tr>`
                     }
                     table = table + '</tbody>';
@@ -60,3 +48,26 @@ $(function(){
             },
          });
 })
+
+function Duration(duration_string){
+    var array = duration_string.split('T');
+    var day = (array[0].split('P'))[1].split("D");
+    var hours = array[1].split('H');
+    var min = hours[1].split("M");
+    var sec = min[1].split("S");
+    day = parseInt(day[0]) * 24;
+    hours = (parseInt(hours[0]) + day).toString();
+    min = (parseInt(min[0])).toString();
+    sec = (parseInt(sec[0])).toString();
+
+    if(hours.length == 1){
+        hours = '0' + hours
+    }
+    if(min.length == 1){
+        min = '0' + min
+    }
+    if(sec.length == 1){
+        sec = '0' + sec
+    }
+    return hours + ':' + min + ':' + sec;
+}

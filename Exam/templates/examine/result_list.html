@@ -1,9 +1,9 @@
-{% extends 'dashboard/basic_dashboard.html' %}
+{% extends 'examine/basic_examine.html' %}
 {% load static %}
 
 
 {% block title %}
-  {{ Server_Title }} | Exam List
+  {{ Server_Title }} | Result List
 {% endblock %}
 
 
@@ -16,23 +16,27 @@
 
 
 {% block content %}
+<div class="d-none" id="test_id_form">
+  {% csrf_token %}
+  <input type="text" name="id" id="test-id" class="d-none" value="{{ id }}" readonly>
+</div>
+
+
 <div class="container-fluid">
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title">All Test List</h3>
+      <h3 class="card-title">Test Attempted Students List</h3>
     </div>
     <!-- /.card-header -->
     <div class="card-body">
-      <table id="table-test" class="table table-bordered table-striped">
+      <table class="table table-bordered table-striped" id="table-test">
         <thead>
-        <tr>
-          <th>Name</th>
-          <th>Subject</th>
-          <th>Status</th>
-          <th>Process</th>
-        </tr>
+          <tr>
+            <th>Name</th>
+            <th>Obtained Marks</th>
+            <th>Required Time</th>
+          </tr>
         </thead>
-
       </table>
     </div>
     <!-- /.card-body -->
@@ -40,7 +44,6 @@
   <!-- /.card -->
 </div>
 
-<script src="{% static 'js/dashboard/exam_list.js' %}"></script>
 <!-- DataTables  & Plugins -->
 <script src="{% static 'plugins/datatables/jquery.dataTables.min.js' %}"></script>
 <script src="{% static 'plugins/datatables-bs4/js/dataTables.bootstrap4.min.js' %}"></script>
@@ -54,14 +57,9 @@
 <script src="{% static 'plugins/datatables-buttons/js/buttons.html5.min.js' %}"></script>
 <script src="{% static 'plugins/datatables-buttons/js/buttons.print.min.js' %}"></script>
 <script src="{% static 'plugins/datatables-buttons/js/buttons.colVis.min.js' %}"></script>
-<script>
-  $(function () {
-    $("#test-table").DataTable({
-      "responsive": true, "lengthChange": false, "autoWidth": false,
-      "buttons": ["excel", "pdf"]
-    }).buttons().container().appendTo('#example1_wrapper .col-md-6:eq(0)');
-  });
-</script>
+
+<script src="{% static 'js/examine/result_list.js' %}"></script>
+
 {% endblock %}
 
 

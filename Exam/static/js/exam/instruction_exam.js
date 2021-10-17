@@ -1,4 +1,6 @@
 $(function(){
+
+
     var token = $("input[name='csrfmiddlewaretoken']").val();
     var id = $("#test-id").val();
     var url = "/api/test";
@@ -33,61 +35,8 @@ $(function(){
                         data['test'].till_date = DateTime(data['test'].till_date)
                     }
 
-                    var status = data['status']
-                    if(status == null){
-                        var button = `
-                            <div class="text-right">
-                              <form action="/instruction" method="post">
-                                <input type="hidden" name="csrfmiddlewaretoken" value="`
-                                        + token +
-                                    `">
-                                <input type="hidden" id="id" name="id" value="`
-                                        + data['test'].id +
-                                    `" class="d-none" readonly>
-                                <button type="submit" class="btn btn-success px-4">Start</a>
-                              </form>
-                            </div>
-                        `
-                    }
-                    else if(status){
-                        var button = `
-                            <div class="text-right">
-                                <a href="/result/` + id + `" class="btn btn-success px-4" >Result</a>
-                            </div>
-                        `
-                    }
-                    else{
-                        var button = `
-                            <div class="text-right">
-                              <form action="/instruction" method="post">
-                                <input type="hidden" name="csrfmiddlewaretoken" value="`
-                                        + token +
-                                    `">
-                                <input type="hidden" id="id" name="id" value="`
-                                        + data['test'].id +
-                                    `" class="d-none" readonly>
-                                <button type="submit" class="btn btn-success px-4">Continue</a>
-                              </form>
-                            </div>
-                        `
-                    }
-
                     $("#test-information-card").append(`
-                        <div class="card mt-3">
-                          <div class="card-header">
-                            <h2 class="card-title"><b>`
-                                 + data['test'].title +
-                            `</b></h2>
-                            `
-                            + button +
-                            `
-                          </div>
-                          <!-- /.card-header -->
-                          <div class="card-body container-fluid">
                             <dl class="row">
-                              <dt class="col-sm-4">Author</dt>
-                              <dd class="col-sm-8">`+ data['test'].author +`</dd>
-
                               <dt class="col-sm-4">Title</dt>
                               <dd class="col-sm-8">`+ data['test'].title +`</dd>
 
@@ -105,21 +54,54 @@ $(function(){
 
                               <dt class="col-sm-4">Total Time</dt>
                               <dd class="col-sm-8">`+ Duration(data['test'].total_time) +`</dd>
-
-                              <dt class="col-sm-4">From Date</dt>
-                              <dd class="col-sm-8">`+ data['test'].from_date +`</dd>
-
-                              <dt class="col-sm-4">Till date</dt>
-                              <dd class="col-sm-8">`+ data['test'].till_date +`</dd>
                             </dl>
-                          </div>
-                        </div>
                     `)
-
+                    return true;
                 }
                 else{
                     if(data['code'] == 400){
                         window.location.href = "/error?error=400 - BAD REQUEST&message="+data['data']['message'];
+                    }
+                    return false;
+                }
+           },
+            error: function (data) {
+                console.log('An error occurred.');
+                console.log(data);
+            },
+         });
+         return false;
+})
+
+$("#start_exam_form").submit(function(e) {
+    $("#start_exam").attr('disabled','disabled');
+
+    var csrfmiddlewaretoken = $("input[name='csrfmiddlewaretoken']").val();
+    var id = $("input[name='id']").val();
+
+    e.preventDefault();
+    var form = $(this);
+    var url = form.attr('action');
+    var type = form.attr('method');
+    $.ajax({
+           async: true,
+           type: type,
+           url: url,
+           data: {
+                'csrfmiddlewaretoken': csrfmiddlewaretoken,
+                'id': id
+           },
+           success: function(data)
+           {
+                if(data['status']){
+					window.location.href = '/exam';
+                }
+                else{
+                    if(data['code'] == 400){
+                        window.location.href = '/error?error=400 - BAD REQUEST&message=' + data['data']['message'];
+                    }
+                    else{
+                        $("#start_exam").removeAttr('disabled');
                     }
                 }
            },
@@ -128,6 +110,16 @@ $(function(){
                 console.log(data);
             },
          });
+    return false;
+});
+
+$("#agree_box").on('change', function(){
+    if($("#agree_box").prop('checked') == true){
+        $("#start_exam").prop('disabled', false);
+    }
+    else{
+        $("#start_exam").prop('disabled', true);
+    }
 })
 
 function Duration(duration_string){

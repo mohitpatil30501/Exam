@@ -227,3 +227,54 @@ class Examine:
                 return redirect("/")
         else:
             return redirect("/error?error=400 - BAD REQUEST&message=Wrong Request Method Used")
+
+    def result_list(self, id):
+        if self.method == "GET":
+            if self.user.is_authenticated:
+                if self.user.is_staff:
+                    return render(self, "examine/result_list.html", {
+                        'id': id
+                    })
+                else:
+                    return redirect("/error?error=403 - FORBIDDEN&message=Access Denied")
+            else:
+                return redirect("/")
+        else:
+            return redirect("/error?error=400 - BAD REQUEST&message=Wrong Request Method Used")
+
+
+class Exam:
+    def exam(self):
+        if self.method == "GET":
+            if self.user.is_authenticated:
+                id = self.session['exam'].get('answersheet')
+                return render(self, "exam/exam.html", {
+                    'id': id,
+                })
+            else:
+                return redirect("/error?error=400 - BAD REQUEST&message=Not Permitted this Process")
+        else:
+            return redirect("/error?error=400 - BAD REQUEST&message=Wrong Request Method Used")
+
+    def instruction(self):
+        if self.method == "POST":
+            if self.user.is_authenticated:
+                id = self.POST.get('id')
+                return render(self, "exam/instruction_exam.html", {
+                    'id': id,
+                })
+            else:
+                return redirect("/error?error=400 - BAD REQUEST&message=Not Permitted this Process")
+        else:
+            return redirect("/error?error=400 - BAD REQUEST&message=Wrong Request Method Used")
+
+    def result(self, id):
+        if self.method == "GET":
+            if self.user.is_authenticated:
+                return render(self, "exam/result.html", {
+                    'id': id
+                })
+            else:
+                return redirect("/error?error=400 - BAD REQUEST&message=Not Permitted this Process")
+        else:
+            return redirect("/error?error=400 - BAD REQUEST&message=Wrong Request Method Used")

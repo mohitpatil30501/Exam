@@ -47,7 +47,10 @@ $(function(){
                                  + data['test'].title +
                             `</b></h2>
                             <div class="text-right">
-                              <a href="/examine/edit_test/`+ data['test'].id +`" class="btn btn-primary">Edit</a>
+                                <div class="text-right">
+                                  <a href="/examine/result_list/`+ data['test'].id +`" class="btn btn-success">Results</a>
+                                  <a href="/examine/edit_test/`+ data['test'].id +`" class="btn btn-primary">Edit</a>
+                                </div>
                             </div>
                           </div>
                           <!-- /.card-header -->

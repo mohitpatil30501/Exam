@@ -25,8 +25,13 @@ urlpatterns = [
     path('examine/add_test', views.Examine.add_test),
     path('examine/test/<id>', views.Examine.test),
     path('examine/edit_test/<id>', views.Examine.edit_test),
+    path('examine/result_list/<id>', views.Examine.result_list),
 
     path('examine/add_question/<id>', views.Examine.add_question),
     path('examine/question/<id>', views.Examine.question),
     path('examine/edit_question/<id>', views.Examine.edit_question),
+
+    path('exam', views.Exam.exam),
+    path('instruction', views.Exam.instruction),
+    path('result/<id>', views.Exam.result),
 ]

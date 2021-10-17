@@ -17,6 +17,7 @@ def configure_website(request):
     return {
         'Server_Title': config_website.get('Server', 'server.title'),
         'Server_Description': config_website.get('Server', 'server.description'),
+        'Version': config_website.get('Server', 'server.version'),
     }
 
 
@@ -103,7 +104,7 @@ LANGUAGE_CODE = config.get('Server', 'server.language_code')
 TIME_ZONE = config.get('Server', 'server.time_zone')
 USE_I18N = True
 USE_L10N = True
-USE_TZ = True
+USE_TZ = False
 
 
 STATIC_URL = '/static/'

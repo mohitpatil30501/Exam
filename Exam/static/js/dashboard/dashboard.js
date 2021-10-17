@@ -36,6 +36,54 @@ $(function(){
                             )
                         }
                     }
+
+                    var testListLength = data['in_progress_test_list'].length;
+                    if(testListLength == 0){
+                        $("#in_process_test").append(
+                                `<p class="text-muted ml-4">No Recent Process</p>`
+                            )
+                    }
+                    else{
+                        for (var i = 0; i < testListLength; i++) {
+                            $("#in_process_test").append(
+                                `<div class="col-lg-3 col-6">
+                                  <div class="small-box bg-danger">
+                                    <div class="inner">
+                                      <h4><b>` + data['in_progress_test_list'][i].title + `</b></h4>
+                                      <p>` + data['in_progress_test_list'][i].subject + `</p>
+                                    </div>
+                                    <a href="/test/` + data['in_progress_test_list'][i].id + `" class="small-box-footer">
+                                      More info <i class="fas fa-arrow-circle-right"></i>
+                                    </a>
+                                  </div>
+                                </div>`
+                            )
+                        }
+                    }
+
+                    var testListLength = data['completed_test_list'].length;
+                    if(testListLength == 0){
+                        $("#completed_test").append(
+                                `<p class="text-muted ml-4">No Recent Completed</p>`
+                            )
+                    }
+                    else{
+                        for (var i = 0; i < testListLength; i++) {
+                            $("#completed_test").append(
+                                `<div class="col-lg-3 col-6">
+                                  <div class="small-box bg-success">
+                                    <div class="inner">
+                                      <h4><b>` + data['completed_test_list'][i].title + `</b></h4>
+                                      <p>` + data['completed_test_list'][i].subject + `</p>
+                                    </div>
+                                    <a href="/test/` + data['completed_test_list'][i].id + `" class="small-box-footer">
+                                      More info <i class="fas fa-arrow-circle-right"></i>
+                                    </a>
+                                  </div>
+                                </div>`
+                            )
+                        }
+                    }
                 }
                 else{
                     if(data['code'] == 400){
