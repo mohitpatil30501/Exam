@@ -1,8 +1,26 @@
 import random
 import uuid
+import datetime
 
 from django.contrib.auth.models import User
 from django.db import models
+
+
+class LoginAttempt(models.Model):
+    """
+    Model to track login attempts for account lockout functionality
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='login_attempts')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    successful = models.BooleanField(default=False)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+    
+    def __str__(self):
+        return f"{self.user.username} - {'Success' if self.successful else 'Failed'} at {self.timestamp}"
 
 
 def get_uuid():
@@ -134,3 +152,24 @@ class Answer(models.Model):
 
     def __str__(self):
         return str(self.id)
+
+
+def get_uuid_reset_token():
+    while True:
+        id = uuid.uuid4()
+        if PasswordResetToken.objects.filter(token=id).count() == 0:
+            return id
+
+
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    token = models.UUIDField(default=get_uuid_reset_token, primary_key=True, unique=True)
+    is_used = models.BooleanField(default=False)
+    expiry_date = models.DateTimeField()
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.token}"
+    
+    def is_valid(self):
+        return not self.is_used and self.expiry_date > datetime.datetime.now()

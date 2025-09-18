@@ -1,73 +1,105 @@
 import base64
 import datetime
 import json
+import logging
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.contrib.messages.storage import session
-from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
-from cryptography.fernet import Fernet
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
+from django.conf import settings
+from .utils import send_email_safely
+from .crypto_utils import key_maker, SecureFernetEncryption, generate_secure_token
 
-from Exam.settings import EMAIL_FROM, SECRET_KEY
+from Exam.settings import EMAIL_FROM
 from .models import UserInformation, Test, AnswerSheet, Question, Answer
 
 
-def key_maker(username):
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=b'\xcfz\xfc\xdcF\xc1d\xc1\xb4\xfa5%\xe7\xa5\x14\x16',
-        iterations=100000,
-        backend=default_backend()
-    )
-    return Fernet(base64.urlsafe_b64encode(kdf.derive(str(SECRET_KEY + username[::-1]).encode())))
-
-
 class Users:
+    @ensure_csrf_cookie
     def login(self):
         if self.method == "POST":
             username = self.POST.get('username')
             password = self.POST.get('password')
 
+            # Check if user exists
             if User.objects.filter(username=username).count() == 0:
                 return JsonResponse({
                     'status': False,
                     'code': 404,
                     'data': {
-                        'message': "Username Does Not Exist"
+                        'message': "Username does not exist"
                     }
                 })
 
-            if not User.objects.filter(username=username).get().is_active:
+            user = User.objects.get(username=username)
+            
+            # Check if account is active
+            if not user.is_active:
                 return JsonResponse({
                     'status': False,
-                    'code': 404,
+                    'code': 403,
                     'data': {
-                        'message': "User is Not Activated"
+                        'message': "User account is not activated"
+                    }
+                })
+            
+            # Check if account is locked due to too many failed attempts
+            from api.auth_utils import is_account_locked, add_login_attempt
+            if is_account_locked(user):
+                # Add this failed attempt to the log
+                add_login_attempt(user, request=self, successful=False)
+                
+                return JsonResponse({
+                    'status': False,
+                    'code': 403,
+                    'data': {
+                        'message': "Account temporarily locked due to too many failed login attempts. Please try again later or reset your password."
                     }
                 })
 
-            user = authenticate(self, username=username, password=password)
-            if user is None:
+            # Attempt authentication
+            auth_user = authenticate(self, username=username, password=password)
+            if auth_user is None:
+                # Log failed attempt
+                from api.auth_utils import add_login_attempt, get_recent_failed_attempts
+                add_login_attempt(user, request=self, successful=False)
+                
+                # Get count of failed attempts to inform the user
+                max_attempts = getattr(settings, 'MAX_LOGIN_ATTEMPTS', 5)
+                recent_failures = get_recent_failed_attempts(user)
+                remaining_attempts = max(0, max_attempts - recent_failures)
+                
                 return JsonResponse({
                     'status': False,
-                    'code': 404,
+                    'code': 401,
                     'data': {
-                        'message': "Incorrect Password."
+                        'message': f"Incorrect password. You have {remaining_attempts} attempt(s) remaining before your account is locked."
                     }
                 })
             else:
-                login(self, user)
+                # Log successful attempt and reset failed attempts counter
+                from api.auth_utils import add_login_attempt
+                add_login_attempt(user, request=self, successful=True)
+                
+                # Get session timeout from settings
+                session_timeout = getattr(settings, 'SESSION_COOKIE_AGE', 1800)  # 30 minutes default
+                
+                # Set session expiry
+                self.session.set_expiry(session_timeout)
+                
+                # Login the user
+                login(self, auth_user)
+                
                 return JsonResponse({
                     'status': True,
                     'code': 200,
                     'data': {
-                        'message': "User Authenticated"
+                        'message': "User authenticated successfully",
+                        'username': user.username,
+                        'sessionTimeout': session_timeout
                     }
                 })
         else:
@@ -168,18 +200,24 @@ class Users:
             </body>
             </html>'''
 
-            mail_status = send_mail(subject=subject, message=message, from_email=from_email,
-                                    recipient_list=recipient_list,
-                                    fail_silently=False, html_message=html_message)
-            if not mail_status:
+            # Send email with better error handling
+            success, error = send_email_safely(
+                subject=subject,
+                message=message,
+                recipient_list=recipient_list,
+                html_message=html_message
+            )
+            
+            if not success:
+                logging.error(f"Failed to send verification email: {error}")
                 user.delete()
                 user_info.delete()
                 return JsonResponse({
                     'status': False,
-                    'code': 400,
+                    'code': 500,
                     'data': {
-                        'error': "400 - BAD REQUEST",
-                        'message': "Something error occurred, Try Again"
+                        'error': "500 - SERVER ERROR",
+                        'message': "Failed to send verification email. Please try again or contact support."
                     }
                 })
             return JsonResponse({
@@ -199,15 +237,33 @@ class Users:
                 }
             })
 
+    @csrf_protect
     def logout(self):
         if self.method == "POST":
             if self.user.is_authenticated:
+                # Log user activity before logout
+                from api.auth_utils import record_logout
+                record_logout(self.user, request=self)
+                
+                # Perform logout
                 logout(self)
+                
+                # Ensure session is cleared
+                self.session.flush()
+                
                 return JsonResponse({
                     'status': True,
                     'code': 200,
                     'data': {
-                        'message': "Logout Successful"
+                        'message': "Logout successful"
+                    }
+                })
+            else:
+                return JsonResponse({
+                    'status': False,
+                    'code': 401,
+                    'data': {
+                        'message': "Not logged in"
                     }
                 })
             return JsonResponse({
@@ -259,64 +315,92 @@ class Users:
                             'message': 'User Found, But user not a Student',
                         }
                     })
-                key = key_maker(user.username)
-                data = {
-                    "id": str(user_info.id),
-                    "username": user.username,
-                    "valid_time": str(datetime.datetime.today() + datetime.timedelta(minutes=15))
-                }
-                data = key.encrypt(json.dumps(data).encode()).decode()
-                url = self.build_absolute_uri("/accounts/reset_password")
+                
+                # Create a new password reset token that expires in 15 minutes
+                expiry_time = datetime.datetime.now() + datetime.timedelta(minutes=15)
+                reset_token = PasswordResetToken.objects.create(
+                    user=user,
+                    expiry_date=expiry_time
+                )
+                
+                # Generate the password reset URL with the token
+                reset_url = self.build_absolute_uri(f"/accounts/reset_password?token={reset_token.token}")
 
                 subject = "Reset Password"
-                message = ''
+                message = f"Click the link below to reset your password. This link is valid for 15 minutes.\n\n{reset_url}"
                 from_email = EMAIL_FROM
-                recipient_list = [user.email, ]
+                recipient_list = [user.email]
 
-                html_message = '''
+                html_message = f'''
                     <!DOCTYPE html>
                     <html>
                     <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>
+                            body {{ font-family: Arial, sans-serif; line-height: 1.6; }}
+                            .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                            .btn {{ display: inline-block; background-color: #4CAF50; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 5px; }}
+                            .warning {{ color: #ff0000; font-weight: bold; }}
+                        </style>
                     </head>
                     <body>
-                        <h1>Reset Password</h1>
-                        <form method="GET" action="''' + str(url) + '''">
-                            <input type="text" name="username" value="''' + str(user.username) + '''" readonly style="display: none;" required>
-                            <input type="text" name="data" value="''' + str(data) + '''" readonly style="display: none;" required>
-                            <button type="submit">Click to Reset</button>
-                        </form>
-                        <hr>
-                        <p>Valid for 15 min only</p>
-                        <h2>If this mail is not relatable, Please Do not Click to Verify...!</h2>
+                        <div class="container">
+                            <h1>Reset Your Password</h1>
+                            <p>We received a request to reset your password. Click the button below to create a new password:</p>
+                            <p><a href="{reset_url}" class="btn">Reset Password</a></p>
+                            <p>This link will expire in 15 minutes.</p>
+                            <p>If you didn't request this password reset, you can ignore this email.</p>
+                            <p class="warning">Do not share this link with anyone!</p>
+                        </div>
                     </body>
                     </html>
-                    '''
-                try:
-                    send_mail(subject=subject, message=message, from_email=from_email, recipient_list=recipient_list,
-                              fail_silently=False,
-                              html_message=html_message)
+                '''
+                
+                # Send email with better error handling
+                success, error = send_email_safely(
+                    subject=subject,
+                    message=message,
+                    recipient_list=recipient_list,
+                    html_message=html_message
+                )
+                
+                if success:
                     return JsonResponse({
                         'status': True,
                         'code': 200,
                         'data': {
-                            'message': 'Email Send Successfully',
+                            'message': 'Password reset email sent successfully',
                         }
                     })
-                except:
+                else:
+                    logging.error(f"Failed to send password reset email: {error}")
                     return JsonResponse({
                         'status': False,
-                        'code': 404,
+                        'code': 500,
                         'data': {
-                            'message': 'Failed to Send Email',
+                            'message': 'Failed to send password reset email. Please contact support.',
                         }
                     })
-            except:
+            except Exception as e:
+                # Log the exception for debugging
+                print(f"Email sending failed: {str(e)}")
                 return JsonResponse({
                     'status': False,
-                    'code': 400,
+                    'code': 500,
+                    'data': {
+                        'message': 'Failed to send password reset email',
+                    }
+                })
+            except Exception as e:
+                # Log the exception for debugging
+                print(f"Password reset error: {str(e)}")
+                return JsonResponse({
+                    'status': False,
+                    'code': 500,
                     'data': {
                         'error': "500 - Server Error",
-                        'message': 'Data Extraction or Processing Problem',
+                        'message': 'Error processing your password reset request',
                     }
                 })
         else:
@@ -331,10 +415,10 @@ class Users:
 
     def reset_password(self):
         if self.method == "GET":
-            username = self.GET.get('username')
-            data = self.GET.get('data')
+            token = self.GET.get('token')
 
-            if username is None and data is None:
+            # Handle case where user is already authenticated
+            if token is None:
                 if self.user.is_authenticated:
                     if UserInformation.objects.filter(user=self.user).count() != 0:
                         user_info = UserInformation.objects.filter(user=self.user).get()
@@ -364,103 +448,166 @@ class Users:
                         }
                     })
             else:
-                key = key_maker(username)
+                # Verify the token
                 try:
-                    data = key.decrypt(data.encode()).decode()
-                    data = json.loads(data)
-
-                    valid_time = datetime.datetime.strptime(data["valid_time"], '%Y-%m-%d %H:%M:%S.%f')
-
-                    if datetime.timedelta(minutes=0,
-                                          seconds=0) <= valid_time - datetime.datetime.today() <= datetime.timedelta(
-                        minutes=15, seconds=0) and username == data['username']:
-                        # change state to Active
-                        try:
-                            user = User.objects.filter(username=username).get()
-                            if UserInformation.objects.filter(user=user).count() != 0:
-                                user_info = UserInformation.objects.filter(user=user).get()
-                            else:
-                                return JsonResponse({
-                                    'status': False,
-                                    'code': 400,
-                                    'data': {
-                                        'error': "400 - BAD REQUEST",
-                                        'message': 'User Have No Role',
-                                    }
-                                })
-                            if str(user_info.id) != data['id']:
-                                return JsonResponse({
-                                    'status': False,
-                                    'code': 400,
-                                    'data': {
-                                        'error': "400 - BAD REQUEST",
-                                        'message': 'Link is Invalid',
-                                    }
-                                })
+                    # Try to find the token
+                    reset_token = PasswordResetToken.objects.filter(token=token).first()
+                    
+                    if not reset_token:
+                        return JsonResponse({
+                            'status': False,
+                            'code': 400,
+                            'data': {
+                                'error': "400 - BAD REQUEST",
+                                'message': 'Invalid password reset token',
+                            }
+                        })
+                    
+                    # Check if the token is valid (not used and not expired)
+                    if reset_token.is_used:
+                        return JsonResponse({
+                            'status': False,
+                            'code': 400,
+                            'data': {
+                                'error': "400 - BAD REQUEST",
+                                'message': 'This password reset link has already been used',
+                            }
+                        })
+                    
+                    if reset_token.expiry_date < datetime.datetime.now():
+                        return JsonResponse({
+                            'status': False,
+                            'code': 400,
+                            'data': {
+                                'error': "400 - BAD REQUEST",
+                                'message': 'This password reset link has expired',
+                            }
+                        })
+                    
+                    # Token is valid, check user info
+                    user = reset_token.user
+                    
+                    try:
+                        if UserInformation.objects.filter(user=user).count() != 0:
+                            user_info = UserInformation.objects.filter(user=user).get()
+                            
+                            # Return user info for the password reset form
                             return JsonResponse({
                                 'status': True,
                                 'code': 200,
                                 'data': {
-                                    'id': user_info.id,
+                                    'token': str(reset_token.token),
+                                    'username': user.username,
                                 }
                             })
-                        except:
+                        else:
                             return JsonResponse({
                                 'status': False,
                                 'code': 400,
                                 'data': {
                                     'error': "400 - BAD REQUEST",
-                                    'message': 'Unable to Extract user data...!',
+                                    'message': 'User account is not properly set up',
                                 }
                             })
+                    except Exception as e:
+                        # Log the exception for debugging
+                        print(f"Error retrieving user info: {str(e)}")
+                        return JsonResponse({
+                            'status': False,
+                            'code': 400,
+                            'data': {
+                                'error': "400 - BAD REQUEST",
+                                'message': 'Unable to retrieve user information',
+                            }
+                        })
+                    
+                except Exception as e:
+                    # Log the exception for debugging
+                    print(f"Token validation error: {str(e)}")
                     return JsonResponse({
                         'status': False,
                         'code': 400,
                         'data': {
                             'error': "400 - BAD REQUEST",
-                            'message': 'Link is Not Valid...!',
+                            'message': 'Invalid password reset request',
                         }
                     })
-                except:
-                    return JsonResponse({
-                        'status': False,
-                        'code': 400,
-                        'data': {
-                            'error': "400 - BAD REQUEST",
-                            'message': 'Something went wrong...!',
-                        }
-                    })
+        
         elif self.method == "POST":
-            id = self.POST.get('id')
+            token = self.POST.get('token')
             password = self.POST.get('password')
-            try:
-                if UserInformation.objects.filter(id=id).count() == 0:
-                    return JsonResponse({
-                        'status': False,
-                        'code': 404,
-                        'data': {
-                            'message': 'User Not Found',
-                        }
-                    })
-                else:
-                    user_info = UserInformation.objects.filter(id=id).get()
-                    user_info.user.set_password(password)
-                    user_info.user.save()
-
-                return JsonResponse({
-                    'status': True,
-                    'code': 200,
-                    'data': {
-                        'message': 'Reset Password Successful',
-                    }
-                })
-            except:
+            confirm_password = self.POST.get('confirm_password')
+            
+            # Basic password validation
+            if not password:
                 return JsonResponse({
                     'status': False,
                     'code': 400,
                     'data': {
-                        'error': "400 - BAD REQUEST",
-                        'message': 'Unable to Extract user data...!',
+                        'message': 'Password cannot be empty',
+                    }
+                })
+            
+            if password != confirm_password:
+                return JsonResponse({
+                    'status': False,
+                    'code': 400,
+                    'data': {
+                        'message': 'Passwords do not match',
+                    }
+                })
+            
+            if len(password) < 8:
+                return JsonResponse({
+                    'status': False,
+                    'code': 400,
+                    'data': {
+                        'message': 'Password must be at least 8 characters long',
+                    }
+                })
+            
+            try:
+                # Find and validate the token
+                reset_token = PasswordResetToken.objects.filter(token=token).first()
+                
+                if not reset_token or reset_token.is_used or reset_token.expiry_date < datetime.datetime.now():
+                    return JsonResponse({
+                        'status': False,
+                        'code': 400,
+                        'data': {
+                            'message': 'Invalid or expired password reset token',
+                        }
+                    })
+                
+                # Get the user and update their password
+                user = reset_token.user
+                user.set_password(password)
+                user.save()
+                
+                # Mark the token as used
+                reset_token.is_used = True
+                reset_token.save()
+                
+                # Invalidate all other tokens for this user
+                PasswordResetToken.objects.filter(user=user, is_used=False).update(is_used=True)
+                
+                return JsonResponse({
+                    'status': True,
+                    'code': 200,
+                    'data': {
+                        'message': 'Your password has been reset successfully',
+                    }
+                })
+                
+            except Exception as e:
+                # Log the exception for debugging
+                print(f"Password reset error: {str(e)}")
+                return JsonResponse({
+                    'status': False,
+                    'code': 500,
+                    'data': {
+                        'error': "500 - Server Error",
+                        'message': 'Failed to reset password',
                     }
                 })
         else:

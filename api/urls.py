@@ -1,8 +1,17 @@
 from django.urls import path
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.http import JsonResponse
 
 from . import views
 
+# View function for refreshing CSRF token
+@ensure_csrf_cookie
+def refresh_csrf(request):
+    return JsonResponse({'status': 'CSRF cookie set'})
+
 urlpatterns = [
+    # Security endpoints
+    path('refresh-csrf/', refresh_csrf, name='refresh-csrf'),
     path('accounts/login', views.Users.login),
     path('accounts/register', views.Users.register),
     path('accounts/logout', views.Users.logout),

@@ -18,6 +18,12 @@
         <!-- Theme style -->
         <link rel="stylesheet" href="{% static 'css/adminlte.min.css' %}">
 
+        <!-- Meta security tags -->
+        <meta http-equiv="X-Content-Type-Options" content="nosniff">
+        <meta http-equiv="X-XSS-Protection" content="1; mode=block">
+        <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+        <meta name="referrer" content="same-origin">
+        
         <!-- jQuery -->
         <script src="{% static 'plugins/jquery/jquery.min.js' %}"></script>
         <!-- Bootstrap 4 -->
@@ -25,6 +31,10 @@
         <!-- AdminLTE App -->
         <script src="{% static 'js/adminlte.min.js' %}"></script>
         <script src="{% static 'js/demo.js' %}"></script>
+        <!-- CSRF Protection -->
+        <script src="{% static 'js/csrf-protection.js' %}"></script>
+        <!-- Security JS -->
+        <script src="{% static 'js/security.js' %}"></script>
 
         {% block head %}
 
